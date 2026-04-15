@@ -3,7 +3,7 @@ import { nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { loadAMap } from '@/lib/amap'
 import type { HomeAddress } from '@/api/address'
-import type { CompanyCommute } from '@/api/commute'
+import type { CompanyCommute, CommuteResultItem } from '@/api/commute'
 
 const props = defineProps<{
   home?: HomeAddress | null
@@ -18,8 +18,9 @@ let map: any = null
 let homeMarker: any = null
 const companyMarkers = new Map<number, any>()
 const lines = new Map<number, any>()
+let highlightRoute: any = null // 高亮的真实路线
 
-function clearMapElements() {
+function clearStatic() {
   homeMarker?.setMap?.(null)
   homeMarker = null
   companyMarkers.forEach((m) => m.setMap(null))
@@ -28,10 +29,21 @@ function clearMapElements() {
   lines.clear()
 }
 
+function clearHighlightRoute() {
+  highlightRoute?.setMap?.(null)
+  highlightRoute = null
+}
+
 function minDurationMin(cc: CompanyCommute): number {
   const work = cc.items.filter((it) => it.direction === 'to_work')
   if (work.length === 0) return 0
   return Math.min(...work.map((it) => it.duration_min))
+}
+
+function bestItemWithPolyline(cc: CompanyCommute): CommuteResultItem | undefined {
+  const work = cc.items.filter((it) => it.direction === 'to_work' && it.polyline)
+  if (!work.length) return undefined
+  return work.reduce((a, b) => (a.duration_min <= b.duration_min ? a : b))
 }
 
 function colorByDuration(min: number): string {
@@ -41,11 +53,20 @@ function colorByDuration(min: number): string {
   return '#dc2626'
 }
 
-function render() {
-  if (!map || !AMap || !props.home) return
-  clearMapElements()
+function parsePolyline(p: string): [number, number][] {
+  return p
+    .split(';')
+    .map((pair) => {
+      const [lng, lat] = pair.split(',').map(Number)
+      return [lng, lat] as [number, number]
+    })
+    .filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat))
+}
 
-  // 家标记（蓝色房屋）
+function renderStatic() {
+  if (!map || !AMap || !props.home) return
+  clearStatic()
+
   homeMarker = new AMap.Marker({
     position: [props.home.longitude, props.home.latitude],
     map,
@@ -60,40 +81,78 @@ function render() {
   props.companies?.forEach((cc) => {
     const dur = minDurationMin(cc)
     const color = colorByDuration(dur)
-    const isHighlight = props.highlightCompanyId === cc.company_id
     positions.push([cc.company_longitude, cc.company_latitude])
 
-    // 公司标记
     const marker = new AMap.Marker({
       position: [cc.company_longitude, cc.company_latitude],
       map,
-      content: `<div style="background:${color};color:white;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:500;box-shadow:0 2px 6px rgba(0,0,0,0.2);white-space:nowrap;${isHighlight ? 'outline:2px solid #0ea5e9;' : ''}">🏢 ${cc.company_name} · ${dur || '-'}min</div>`,
+      content: `<div style="background:${color};color:white;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:500;box-shadow:0 2px 6px rgba(0,0,0,0.2);white-space:nowrap">🏢 ${cc.company_name} · ${dur || '-'}min</div>`,
       offset: new AMap.Pixel(-30, -36),
     })
     companyMarkers.set(cc.company_id, marker)
 
-    // 连线
-    const polyline = new AMap.Polyline({
+    // 基础虚线（所有公司，细）
+    const line = new AMap.Polyline({
       path: [
         [props.home!.longitude, props.home!.latitude],
         [cc.company_longitude, cc.company_latitude],
       ],
-      strokeColor: isHighlight ? '#0ea5e9' : color,
-      strokeWeight: isHighlight ? 5 : 2.5,
-      strokeOpacity: isHighlight ? 0.9 : 0.5,
-      strokeStyle: isHighlight ? 'solid' : 'dashed',
+      strokeColor: color,
+      strokeWeight: 2,
+      strokeOpacity: 0.3,
+      strokeStyle: 'dashed',
       map,
     })
-    lines.set(cc.company_id, polyline)
+    lines.set(cc.company_id, line)
   })
 
-  // 自动适配
   if (positions.length > 1) {
     map.setFitView(undefined, false, [40, 40, 40, 40])
   } else {
     map.setCenter(positions[0])
     map.setZoom(13)
   }
+}
+
+function renderHighlight() {
+  clearHighlightRoute()
+  if (!map || !AMap || !props.highlightCompanyId) return
+
+  const cc = props.companies?.find((c) => c.company_id === props.highlightCompanyId)
+  if (!cc) return
+
+  const best = bestItemWithPolyline(cc)
+  if (!best || !best.polyline) {
+    // 没有真实路线数据，高亮直线代替
+    const line = lines.get(cc.company_id)
+    if (line) {
+      line.setOptions({
+        strokeColor: '#0ea5e9',
+        strokeWeight: 4,
+        strokeOpacity: 0.9,
+      })
+    }
+    return
+  }
+
+  const path = parsePolyline(best.polyline)
+  if (path.length < 2) return
+
+  highlightRoute = new AMap.Polyline({
+    path,
+    strokeColor: '#0ea5e9',
+    strokeWeight: 6,
+    strokeOpacity: 0.85,
+    lineJoin: 'round',
+    lineCap: 'round',
+    showDir: true,
+    map,
+  })
+
+  // 把高亮路线所在区域框入视野
+  map.setFitView([highlightRoute, homeMarker, companyMarkers.get(cc.company_id)], false, [
+    60, 60, 60, 60,
+  ])
 }
 
 onMounted(async () => {
@@ -107,23 +166,51 @@ onMounted(async () => {
     })
     map.addControl(new AMap.ToolBar({ position: 'RB' }))
     map.addControl(new AMap.Scale())
-    render()
+    renderStatic()
+    renderHighlight()
   } catch (e) {
     message.error('地图加载失败：' + (e as Error).message)
   }
 })
 
 onBeforeUnmount(() => {
-  clearMapElements()
+  clearStatic()
+  clearHighlightRoute()
   map?.destroy?.()
 })
 
+// home/companies 变化 → 重绘静态 + 高亮
 watch(
-  () => [props.home, props.companies, props.highlightCompanyId],
+  () => [props.home, props.companies],
   () => {
-    if (map && AMap) render()
+    if (map && AMap) {
+      renderStatic()
+      renderHighlight()
+    }
   },
   { deep: true },
+)
+
+// 高亮变化 → 只重绘高亮
+watch(
+  () => props.highlightCompanyId,
+  () => {
+    if (map && AMap) {
+      // 恢复所有基础线（取消上次高亮的加粗直线）
+      lines.forEach((line, id) => {
+        const cc = props.companies?.find((c) => c.company_id === id)
+        if (!cc) return
+        const color = colorByDuration(minDurationMin(cc))
+        line.setOptions({
+          strokeColor: color,
+          strokeWeight: 2,
+          strokeOpacity: 0.3,
+          strokeStyle: 'dashed',
+        })
+      })
+      renderHighlight()
+    }
+  },
 )
 </script>
 

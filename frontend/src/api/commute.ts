@@ -32,6 +32,7 @@ export interface CommuteResultItem {
   distance_km: number
   cost_yuan?: number
   transfer_count?: number
+  polyline: string
   from_cache: boolean
   result_id: number
 }

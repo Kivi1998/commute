@@ -52,27 +52,28 @@ type CommuteQueryListItem struct {
 // --- 计算结果 ---
 
 type CommuteResult struct {
-	ID              int64           `json:"id"`
-	UserID          int64           `json:"user_id"`
-	QueryID         *int64          `json:"query_id,omitempty"`
-	HomeID          int64           `json:"home_id"`
-	CompanyID       int64           `json:"company_id"`
-	Direction       string          `json:"direction"`
-	TransportMode   string          `json:"transport_mode"`
-	DepartTime      string          `json:"depart_time"`
-	ArriveTime      string          `json:"arrive_time"`
-	Weekday         int             `json:"weekday"`
-	DurationMin     int             `json:"duration_min"`
-	DurationMinRaw  int             `json:"duration_min_raw"`
-	DistanceKM      float64         `json:"distance_km"`
-	CostYuan        *float64        `json:"cost_yuan,omitempty"`
-	TransferCount   *int            `json:"transfer_count,omitempty"`
-	RouteDetail     json.RawMessage `json:"route_detail"`
-	CalculatedAt    time.Time       `json:"calculated_at"`
-	ExpiresAt       time.Time       `json:"expires_at"`
-	IsFailed        bool            `json:"is_failed"`
-	ErrorMessage    *string         `json:"error_message,omitempty"`
-	FromCache       bool            `json:"from_cache"`
+	ID             int64           `json:"id"`
+	UserID         int64           `json:"user_id"`
+	QueryID        *int64          `json:"query_id,omitempty"`
+	HomeID         int64           `json:"home_id"`
+	CompanyID      int64           `json:"company_id"`
+	Direction      string          `json:"direction"`
+	TransportMode  string          `json:"transport_mode"`
+	DepartTime     string          `json:"depart_time"`
+	ArriveTime     string          `json:"arrive_time"`
+	Weekday        int             `json:"weekday"`
+	DurationMin    int             `json:"duration_min"`
+	DurationMinRaw int             `json:"duration_min_raw"`
+	DistanceKM     float64         `json:"distance_km"`
+	CostYuan       *float64        `json:"cost_yuan,omitempty"`
+	TransferCount  *int            `json:"transfer_count,omitempty"`
+	Polyline       string          `json:"polyline"`
+	RouteDetail    json.RawMessage `json:"route_detail"`
+	CalculatedAt   time.Time       `json:"calculated_at"`
+	ExpiresAt      time.Time       `json:"expires_at"`
+	IsFailed       bool            `json:"is_failed"`
+	ErrorMessage   *string         `json:"error_message,omitempty"`
+	FromCache      bool            `json:"from_cache"`
 }
 
 // --- 响应聚合 ---
@@ -105,6 +106,7 @@ type CommuteResultItem struct {
 	DistanceKM     float64  `json:"distance_km"`
 	CostYuan       *float64 `json:"cost_yuan,omitempty"`
 	TransferCount  *int     `json:"transfer_count,omitempty"`
+	Polyline       string   `json:"polyline"`
 	FromCache      bool     `json:"from_cache"`
 	ResultID       int64    `json:"result_id"`
 }

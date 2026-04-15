@@ -243,6 +243,7 @@ func (s *CommuteService) computeOne(
 		DistanceKM:     round2(distKm),
 		CostYuan:       dir.CostYuan,
 		TransferCount:  dir.TransferCount,
+		Polyline:       dir.Polyline,
 		RouteDetail:    dir.RouteDetail,
 		ExpiresAt:      time.Now().Add(commuteCacheTTL),
 	})
@@ -254,20 +255,20 @@ func (s *CommuteService) computeOne(
 }
 
 func toItem(r *model.CommuteResult, fromCache bool) *model.CommuteResultItem {
-	// 详情不回写给客户端（列表场景），前端要详情再调 /results/:id
 	_ = json.RawMessage(nil)
 	return &model.CommuteResultItem{
-		Direction:     r.Direction,
-		TransportMode: r.TransportMode,
-		DepartTime:    r.DepartTime,
-		ArriveTime:    r.ArriveTime,
-		DurationMin:   r.DurationMin,
+		Direction:      r.Direction,
+		TransportMode:  r.TransportMode,
+		DepartTime:     r.DepartTime,
+		ArriveTime:     r.ArriveTime,
+		DurationMin:    r.DurationMin,
 		DurationMinRaw: r.DurationMinRaw,
-		DistanceKM:    r.DistanceKM,
-		CostYuan:      r.CostYuan,
-		TransferCount: r.TransferCount,
-		FromCache:     fromCache,
-		ResultID:      r.ID,
+		DistanceKM:     r.DistanceKM,
+		CostYuan:       r.CostYuan,
+		TransferCount:  r.TransferCount,
+		Polyline:       r.Polyline,
+		FromCache:      fromCache,
+		ResultID:       r.ID,
 	}
 }
 

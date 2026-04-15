@@ -72,7 +72,7 @@ func (r *CommuteRepo) FindCachedResult(ctx context.Context, key CommuteResultKey
                direction::text, transport_mode::text,
                depart_time::text, arrive_time::text,
                weekday, duration_min, duration_min_raw, distance_km::float8,
-               cost_yuan::float8, transfer_count, route_detail,
+               cost_yuan::float8, transfer_count, polyline, route_detail,
                calculated_at, expires_at, is_failed, error_message
         FROM commute_result
         WHERE home_id = $1 AND company_id = $2
@@ -105,17 +105,17 @@ func (r *CommuteRepo) InsertResult(ctx context.Context, rec CommuteResultInsert)
             user_id, query_id, home_id, company_id,
             direction, transport_mode, depart_time, arrive_time, weekday,
             duration_min, duration_min_raw, distance_km, cost_yuan, transfer_count,
-            route_detail, expires_at, is_failed, error_message
+            polyline, route_detail, expires_at, is_failed, error_message
         )
         VALUES ($1, $2, $3, $4,
                 $5::commute_direction_enum, $6::transport_mode_enum, $7::time, $8::time, $9,
                 $10, $11, $12, $13, $14,
-                $15, $16, $17, $18)
+                $15, $16, $17, $18, $19)
         RETURNING id, user_id, query_id, home_id, company_id,
                   direction::text, transport_mode::text,
                   depart_time::text, arrive_time::text,
                   weekday, duration_min, duration_min_raw, distance_km::float8,
-                  cost_yuan::float8, transfer_count, route_detail,
+                  cost_yuan::float8, transfer_count, polyline, route_detail,
                   calculated_at, expires_at, is_failed, error_message
     `
 	var res model.CommuteResult
@@ -127,7 +127,7 @@ func (r *CommuteRepo) InsertResult(ctx context.Context, rec CommuteResultInsert)
 		rec.UserID, rec.QueryID, rec.HomeID, rec.CompanyID,
 		rec.Direction, rec.TransportMode, rec.DepartTime, rec.ArriveTime, rec.Weekday,
 		rec.DurationMin, rec.DurationMinRaw, rec.DistanceKM, rec.CostYuan, rec.TransferCount,
-		routeDetail, rec.ExpiresAt, rec.IsFailed, rec.ErrorMessage,
+		rec.Polyline, routeDetail, rec.ExpiresAt, rec.IsFailed, rec.ErrorMessage,
 	)
 	if err := scanCommuteResult(row, &res); err != nil {
 		return nil, err
@@ -141,7 +141,7 @@ func (r *CommuteRepo) GetResult(ctx context.Context, userID, id int64) (*model.C
                direction::text, transport_mode::text,
                depart_time::text, arrive_time::text,
                weekday, duration_min, duration_min_raw, distance_km::float8,
-               cost_yuan::float8, transfer_count, route_detail,
+               cost_yuan::float8, transfer_count, polyline, route_detail,
                calculated_at, expires_at, is_failed, error_message
         FROM commute_result WHERE id = $1 AND user_id = $2
     `
@@ -162,7 +162,7 @@ func (r *CommuteRepo) ListResultsByQuery(ctx context.Context, userID, queryID in
                direction::text, transport_mode::text,
                depart_time::text, arrive_time::text,
                weekday, duration_min, duration_min_raw, distance_km::float8,
-               cost_yuan::float8, transfer_count, route_detail,
+               cost_yuan::float8, transfer_count, polyline, route_detail,
                calculated_at, expires_at, is_failed, error_message
         FROM commute_result
         WHERE user_id = $1 AND query_id = $2
@@ -208,6 +208,7 @@ type CommuteResultInsert struct {
 	DistanceKM     float64
 	CostYuan       *float64
 	TransferCount  *int
+	Polyline       string
 	RouteDetail    json.RawMessage
 	ExpiresAt      time.Time
 	IsFailed       bool
@@ -221,7 +222,7 @@ func scanCommuteResult(row pgx.Row, r *model.CommuteResult) error {
 		&r.Direction, &r.TransportMode,
 		&r.DepartTime, &r.ArriveTime,
 		&r.Weekday, &r.DurationMin, &r.DurationMinRaw, &r.DistanceKM,
-		&r.CostYuan, &r.TransferCount, &r.RouteDetail,
+		&r.CostYuan, &r.TransferCount, &r.Polyline, &r.RouteDetail,
 		&r.CalculatedAt, &r.ExpiresAt, &r.IsFailed, &r.ErrorMessage,
 	); err != nil {
 		return err
