@@ -5,6 +5,7 @@ import { message } from 'ant-design-vue'
 import CommuteConfigPanel from '@/components/CommuteConfigPanel.vue'
 import CommuteMap from '@/components/CommuteMap.vue'
 import CommuteResultsTable from '@/components/CommuteResultsTable.vue'
+import CommuteCompareView from '@/components/CommuteCompareView.vue'
 import {
   calculateCommute,
   getCommuteQuery,
@@ -21,6 +22,7 @@ const configRef = ref<InstanceType<typeof CommuteConfigPanel> | null>(null)
 const response = ref<CommuteCalculateResponse | null>(null)
 const highlightId = ref<number | null>(null)
 const calculating = ref(false)
+const viewMode = ref<'list' | 'bar' | 'scatter' | 'radar'>('list')
 
 async function handleCalculate(payload: CommuteCalculateInput) {
   calculating.value = true
@@ -126,13 +128,29 @@ watch(
       </div>
 
       <div class="lg:col-span-2">
-        <a-card title="按通勤时间排序" :bordered="false" size="small">
+        <a-card :bordered="false" size="small">
+          <template #title>
+            <a-radio-group v-model:value="viewMode" size="small" button-style="solid">
+              <a-radio-button value="list">📋 列表</a-radio-button>
+              <a-radio-button value="bar">📊 柱状</a-radio-button>
+              <a-radio-button value="scatter">🔵 散点</a-radio-button>
+              <a-radio-button value="radar">🕸 雷达</a-radio-button>
+            </a-radio-group>
+          </template>
           <template #extra>
-            <span class="text-xs text-slate-400">鼠标悬停看地图高亮</span>
+            <span v-if="viewMode === 'list'" class="text-xs text-slate-400">
+              悬停看地图高亮
+            </span>
           </template>
           <CommuteResultsTable
+            v-if="viewMode === 'list'"
             :results="response.results"
             @highlight="(id) => (highlightId = id)"
+          />
+          <CommuteCompareView
+            v-else
+            :results="response.results"
+            :mode="viewMode"
           />
         </a-card>
       </div>
