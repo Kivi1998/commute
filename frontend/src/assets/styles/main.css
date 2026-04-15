@@ -1,0 +1,23 @@
+@import 'tailwindcss';
+
+/* 防止 Tailwind preflight 覆盖 Ant Design Vue 样式 */
+@layer base {
+  button {
+    background-color: unset;
+  }
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
