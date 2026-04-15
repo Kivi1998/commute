@@ -108,15 +108,24 @@ psql -h 127.0.0.1 -U postgres -d commute -f migrations/0002_seed_default_user.up
 
 ### 4. 启动服务
 
-```bash
-# 后端（端口 8090）
-cd backend
-go run ./cmd/server
+**推荐：一键启停脚本**
 
-# 前端（端口 5173）
-cd frontend
-pnpm install
-pnpm dev
+```bash
+./start.sh          # 等价于 ./dev.sh start
+./stop.sh           # 等价于 ./dev.sh stop
+./dev.sh status     # 查看状态
+./dev.sh logs       # 跟踪两边日志
+./dev.sh restart    # 重启
+```
+
+脚本会：前置检查环境 → 编译后端 → 后台启动两端 → 等待就绪 → 返回 URL。
+日志落在 `.dev/logs/`，PID 落在 `.dev/pid/`（都在 `.gitignore` 里）。
+
+**手动启动（可选）**
+
+```bash
+cd backend && go run ./cmd/server      # 后端 :8090
+cd frontend && pnpm install && pnpm dev # 前端 :5173
 ```
 
 打开浏览器访问 http://localhost:5173
