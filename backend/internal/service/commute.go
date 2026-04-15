@@ -16,7 +16,7 @@ import (
 
 const (
 	commuteCacheTTL       = 7 * 24 * time.Hour
-	commuteMaxConcurrency = 5
+	commuteMaxConcurrency = 2 // 高德个人 Key 默认 3 QPS，保守用 2 并发
 	companySoftLimit      = 20
 )
 

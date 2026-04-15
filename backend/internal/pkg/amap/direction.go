@@ -111,23 +111,45 @@ func (c *Client) Driving(ctx context.Context, opt DirectionOptions) (*DirectionR
 // --- 公交 ---
 
 type transitBusline struct {
-	Name     string `json:"name"`
-	Type     string `json:"type"`
-	Polyline string `json:"polyline"`
+	Name     string          `json:"name"`
+	Type     string          `json:"type"`
+	Polyline json.RawMessage `json:"polyline"`
 }
 
+// transitWalkingStep polyline 字段高德可能返回字符串或 { polyline: "..." } 对象，
+// 用 json.RawMessage 接住再兜底解析。
 type transitWalkingStep struct {
-	Polyline string `json:"polyline"`
+	Polyline json.RawMessage `json:"polyline"`
 }
 
 type transitSegment struct {
 	Walking *struct {
-		Polyline string               `json:"polyline"`
+		Polyline json.RawMessage     `json:"polyline"`
 		Steps    []transitWalkingStep `json:"steps"`
 	} `json:"walking"`
 	Bus *struct {
 		Buslines []transitBusline `json:"buslines"`
 	} `json:"bus"`
+}
+
+// flexString 尝试把 json.RawMessage 解析成 polyline 字符串：
+// 1) 直接是 "lng,lat;..." 字符串 → 取出
+// 2) 是 { "polyline": "..." } 对象 → 取 polyline 字段
+func flexString(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var s string
+	if err := json.Unmarshal(raw, &s); err == nil {
+		return s
+	}
+	var obj struct {
+		Polyline string `json:"polyline"`
+	}
+	if err := json.Unmarshal(raw, &obj); err == nil {
+		return obj.Polyline
+	}
+	return ""
 }
 
 type transitResp struct {
@@ -177,12 +199,13 @@ func (c *Client) Transit(ctx context.Context, opt DirectionOptions) (*DirectionR
 	polys := make([]string, 0, len(t.Segments)*2)
 	for _, seg := range t.Segments {
 		if seg.Walking != nil {
-			if seg.Walking.Polyline != "" {
-				polys = append(polys, seg.Walking.Polyline)
+			wk := flexString(seg.Walking.Polyline)
+			if wk != "" {
+				polys = append(polys, wk)
 			} else {
 				for _, ws := range seg.Walking.Steps {
-					if ws.Polyline != "" {
-						polys = append(polys, ws.Polyline)
+					if s := flexString(ws.Polyline); s != "" {
+						polys = append(polys, s)
 					}
 				}
 			}
@@ -190,8 +213,8 @@ func (c *Client) Transit(ctx context.Context, opt DirectionOptions) (*DirectionR
 		if seg.Bus != nil && len(seg.Bus.Buslines) > 0 {
 			transfers += len(seg.Bus.Buslines)
 			for _, bl := range seg.Bus.Buslines {
-				if bl.Polyline != "" {
-					polys = append(polys, bl.Polyline)
+				if s := flexString(bl.Polyline); s != "" {
+					polys = append(polys, s)
 				}
 			}
 		}
