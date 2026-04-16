@@ -26,6 +26,7 @@ func New(cfg *config.Config, db *pgxpool.Pool, startedAt time.Time) *gin.Engine 
 	companyRepo := repository.NewCompanyRepo(db)
 	commuteRepo := repository.NewCommuteRepo(db)
 	aiRepo := repository.NewAIRepo(db)
+	userRepo := repository.NewUserRepo(db)
 
 	amapClient := amap.New(amap.Config{
 		Key:     cfg.Amap.WebServiceKey,
@@ -44,6 +45,7 @@ func New(cfg *config.Config, db *pgxpool.Pool, startedAt time.Time) *gin.Engine 
 	companySvc := service.NewCompanyService(companyRepo)
 	commuteSvc := service.NewCommuteService(commuteRepo, addressRepo, companyRepo, amapClient)
 	aiSvc := service.NewAIService(aiRepo, doubaoClient, amapClient)
+	authSvc := service.NewAuthService(userRepo, cfg.Auth)
 
 	health := handler.NewHealthHandler(db, cfg, startedAt)
 	meta := handler.NewMetaHandler()
@@ -53,16 +55,25 @@ func New(cfg *config.Config, db *pgxpool.Pool, startedAt time.Time) *gin.Engine 
 	commute := handler.NewCommuteHandler(commuteSvc)
 	mapH := handler.NewMapHandler(amapClient)
 	aiH := handler.NewAIHandler(aiSvc)
+	authH := handler.NewAuthHandler(authSvc)
 
 	v1 := r.Group("/api/v1")
 	{
+		// 公开端点（无需登录）
 		v1.GET("/health", health.Get)
 		v1.GET("/meta/enums", meta.Enums)
+		v1.POST("/auth/login", authH.Login)
+	}
 
-		v1.GET("/profile", profile.Get)
-		v1.PUT("/profile", profile.Upsert)
+	// 需要鉴权的端点
+	authed := r.Group("/api/v1", middleware.RequireAuth(cfg.Auth.JWTSecret))
+	{
+		authed.GET("/auth/me", authH.Me)
 
-		addresses := v1.Group("/addresses")
+		authed.GET("/profile", profile.Get)
+		authed.PUT("/profile", profile.Upsert)
+
+		addresses := authed.Group("/addresses")
 		{
 			addresses.GET("", address.List)
 			addresses.POST("", address.Create)
@@ -72,7 +83,7 @@ func New(cfg *config.Config, db *pgxpool.Pool, startedAt time.Time) *gin.Engine 
 			addresses.POST("/:id/set-default", address.SetDefault)
 		}
 
-		companies := v1.Group("/companies")
+		companies := authed.Group("/companies")
 		{
 			companies.GET("", company.List)
 			companies.POST("", company.Create)
@@ -83,7 +94,7 @@ func New(cfg *config.Config, db *pgxpool.Pool, startedAt time.Time) *gin.Engine 
 			companies.DELETE("/:id", company.Delete)
 		}
 
-		commuteGroup := v1.Group("/commute")
+		commuteGroup := authed.Group("/commute")
 		{
 			commuteGroup.POST("/calculate", commute.Calculate)
 			commuteGroup.GET("/results/:id", commute.GetResult)
@@ -93,14 +104,14 @@ func New(cfg *config.Config, db *pgxpool.Pool, startedAt time.Time) *gin.Engine 
 			commuteGroup.DELETE("/queries/:id", commute.DeleteQuery)
 		}
 
-		mapGroup := v1.Group("/map")
+		mapGroup := authed.Group("/map")
 		{
 			mapGroup.GET("/geocode", mapH.Geocode)
 			mapGroup.GET("/regeocode", mapH.Regeocode)
 			mapGroup.GET("/poi/search", mapH.POISearch)
 		}
 
-		aiGroup := v1.Group("/ai")
+		aiGroup := authed.Group("/ai")
 		{
 			aiGroup.POST("/recommend/companies", aiH.RecommendCompanies)
 		}

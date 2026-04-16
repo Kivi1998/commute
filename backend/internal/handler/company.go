@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/haojia/commute/internal/middleware"
 	"github.com/haojia/commute/internal/model"
 	"github.com/haojia/commute/internal/repository"
 	"github.com/haojia/commute/internal/service"
@@ -25,7 +26,7 @@ func (h *CompanyHandler) List(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, response.CodeBadRequest, err.Error(), nil)
 		return
 	}
-	result, err := h.svc.List(c.Request.Context(), model.DefaultUserID, q)
+	result, err := h.svc.List(c.Request.Context(), middleware.GetUserID(c), q)
 	if err != nil {
 		response.Internal(c, err.Error())
 		return
@@ -38,7 +39,7 @@ func (h *CompanyHandler) Get(c *gin.Context) {
 	if !ok {
 		return
 	}
-	item, err := h.svc.Get(c.Request.Context(), model.DefaultUserID, id)
+	item, err := h.svc.Get(c.Request.Context(), middleware.GetUserID(c), id)
 	if errors.Is(err, repository.ErrNotFound) {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "公司不存在", nil)
 		return
@@ -56,7 +57,7 @@ func (h *CompanyHandler) Create(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, response.CodeBadRequest, err.Error(), nil)
 		return
 	}
-	item, err := h.svc.Create(c.Request.Context(), model.DefaultUserID, in)
+	item, err := h.svc.Create(c.Request.Context(), middleware.GetUserID(c), in)
 	if errors.Is(err, repository.ErrDuplicate) {
 		response.Fail(c, http.StatusConflict, response.CodeConflict, "同名同地址公司已存在", nil)
 		return
@@ -81,7 +82,7 @@ func (h *CompanyHandler) Update(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, response.CodeBadRequest, err.Error(), nil)
 		return
 	}
-	item, err := h.svc.Update(c.Request.Context(), model.DefaultUserID, id, in)
+	item, err := h.svc.Update(c.Request.Context(), middleware.GetUserID(c), id, in)
 	if errors.Is(err, repository.ErrNotFound) {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "公司不存在", nil)
 		return
@@ -103,7 +104,7 @@ func (h *CompanyHandler) UpdateStatus(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, response.CodeBadRequest, err.Error(), nil)
 		return
 	}
-	item, err := h.svc.UpdateStatus(c.Request.Context(), model.DefaultUserID, id, in.Status)
+	item, err := h.svc.UpdateStatus(c.Request.Context(), middleware.GetUserID(c), id, in.Status)
 	if errors.Is(err, repository.ErrNotFound) {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "公司不存在", nil)
 		return
@@ -120,7 +121,7 @@ func (h *CompanyHandler) Delete(c *gin.Context) {
 	if !ok {
 		return
 	}
-	err := h.svc.Delete(c.Request.Context(), model.DefaultUserID, id)
+	err := h.svc.Delete(c.Request.Context(), middleware.GetUserID(c), id)
 	if errors.Is(err, repository.ErrNotFound) {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "公司不存在", nil)
 		return
@@ -138,7 +139,7 @@ func (h *CompanyHandler) Batch(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, response.CodeBadRequest, err.Error(), nil)
 		return
 	}
-	result, err := h.svc.Batch(c.Request.Context(), model.DefaultUserID, in)
+	result, err := h.svc.Batch(c.Request.Context(), middleware.GetUserID(c), in)
 	if err != nil {
 		response.Internal(c, err.Error())
 		return

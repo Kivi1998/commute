@@ -30,6 +30,16 @@ const http: AxiosInstance = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
+// 请求拦截器：自动带上 token
+http.interceptors.request.use((cfg) => {
+  const token = localStorage.getItem('commute.token')
+  if (token) {
+    cfg.headers = cfg.headers ?? {}
+    ;(cfg.headers as any)['Authorization'] = `Bearer ${token}`
+  }
+  return cfg
+})
+
 http.interceptors.response.use(
   (res) => {
     const body = res.data as ApiResponse
@@ -49,7 +59,17 @@ http.interceptors.response.use(
       body?.data,
       body?.request_id,
     )
-    message.error(apiErr.bizMessage)
+    // 401：清登录态并跳登录页
+    if (err.response?.status === 401) {
+      localStorage.removeItem('commute.token')
+      localStorage.removeItem('commute.user')
+      const redirect = window.location.pathname + window.location.search
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = `/login?redirect=${encodeURIComponent(redirect)}`
+      }
+    } else {
+      message.error(apiErr.bizMessage)
+    }
     return Promise.reject(apiErr)
   },
 )

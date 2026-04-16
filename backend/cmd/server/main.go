@@ -12,6 +12,7 @@ import (
 
 	"github.com/haojia/commute/internal/config"
 	"github.com/haojia/commute/internal/database"
+	"github.com/haojia/commute/internal/pkg/auth"
 	"github.com/haojia/commute/internal/router"
 )
 
@@ -32,6 +33,12 @@ func main() {
 	}
 	defer db.Close()
 	log.Printf("database connected: %s/%s", cfg.Database.Host, cfg.Database.Name)
+
+	// 确保固定账号存在（幂等）
+	if err := auth.EnsureSeedUsers(ctx, db, auth.DefaultSeedUsers); err != nil {
+		log.Fatalf("seed users: %v", err)
+	}
+	log.Printf("seed users ensured: %d accounts", len(auth.DefaultSeedUsers))
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.App.Port,

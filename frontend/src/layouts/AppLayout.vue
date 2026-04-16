@@ -1,16 +1,21 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { Modal } from 'ant-design-vue'
 import {
   HomeOutlined,
   BankOutlined,
   CarOutlined,
   HistoryOutlined,
   SettingOutlined,
+  LogoutOutlined,
+  UserOutlined,
 } from '@ant-design/icons-vue'
+import { useAuthStore } from '@/store/auth'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 
 const menuItems = [
   { key: 'home', label: '首页', icon: HomeOutlined, path: '/' },
@@ -26,6 +31,25 @@ function handleSelect(key: string) {
   const item = menuItems.find((m) => m.key === key)
   if (item) router.push(item.path)
 }
+
+function handleLogout() {
+  Modal.confirm({
+    title: '确认退出登录？',
+    content: '下次使用需要重新登录。',
+    okType: 'danger',
+    okText: '退出',
+    cancelText: '取消',
+    onOk: () => {
+      auth.logout()
+      router.push('/login')
+    },
+  })
+}
+
+onMounted(() => {
+  // 启动时拉最新用户信息（token 过期会触发 401 → 拦截器跳登录）
+  auth.refreshMe()
+})
 </script>
 
 <template>
@@ -45,6 +69,29 @@ function handleSelect(key: string) {
           <span>{{ item.label }}</span>
         </a-menu-item>
       </a-menu>
+
+      <a-dropdown v-if="auth.user">
+        <div class="flex items-center gap-2 cursor-pointer px-3 py-1 rounded hover:bg-slate-50">
+          <a-avatar size="small" class="!bg-blue-500">
+            <template #icon><UserOutlined /></template>
+          </a-avatar>
+          <span class="text-sm text-slate-700">{{ auth.displayName }}</span>
+        </div>
+        <template #overlay>
+          <a-menu>
+            <a-menu-item disabled>
+              <div class="text-xs text-slate-400">{{ auth.user?.email }}</div>
+            </a-menu-item>
+            <a-menu-divider />
+            <a-menu-item key="settings" @click="router.push('/settings')">
+              <SettingOutlined /> 个人设置
+            </a-menu-item>
+            <a-menu-item key="logout" danger @click="handleLogout">
+              <LogoutOutlined /> 退出登录
+            </a-menu-item>
+          </a-menu>
+        </template>
+      </a-dropdown>
     </a-layout-header>
 
     <a-layout-content class="p-6 bg-slate-50">

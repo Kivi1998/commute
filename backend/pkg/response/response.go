@@ -10,6 +10,8 @@ const (
 	CodeOK              = 0
 	CodeBadRequest      = 40001
 	CodeInvalidValue    = 40002
+	CodeUnauthorized    = 40101
+	CodeForbidden       = 40301
 	CodeNotFound        = 40401
 	CodeConflict        = 40901
 	CodeBizValidation   = 42201

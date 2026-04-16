@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/haojia/commute/internal/middleware"
 	"github.com/haojia/commute/internal/model"
 	"github.com/haojia/commute/internal/pkg/amap"
 	"github.com/haojia/commute/internal/pkg/doubao"
@@ -27,7 +28,7 @@ func (h *AIHandler) RecommendCompanies(c *gin.Context) {
 		return
 	}
 
-	result, err := h.svc.RecommendCompanies(c.Request.Context(), model.DefaultUserID, in)
+	result, err := h.svc.RecommendCompanies(c.Request.Context(), middleware.GetUserID(c), in)
 	if err != nil {
 		var doubaoErr *doubao.APIError
 		if errors.As(err, &doubaoErr) {

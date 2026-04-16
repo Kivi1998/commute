@@ -1,6 +1,13 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import { useAuthStore } from '@/store/auth'
 
 const routes: RouteRecordRaw[] = [
+  {
+    path: '/login',
+    name: 'login',
+    component: () => import('@/pages/Login.vue'),
+    meta: { title: '登录', public: true },
+  },
   {
     path: '/',
     component: () => import('@/layouts/AppLayout.vue'),
@@ -42,6 +49,21 @@ const routes: RouteRecordRaw[] = [
 export const router = createRouter({
   history: createWebHistory(),
   routes,
+})
+
+router.beforeEach((to) => {
+  const auth = useAuthStore()
+  if (to.meta.public) {
+    // 已登录访问 /login 直接回首页
+    if (to.name === 'login' && auth.isAuthenticated) {
+      return { path: '/' }
+    }
+    return true
+  }
+  if (!auth.isAuthenticated) {
+    return { path: '/login', query: { redirect: to.fullPath } }
+  }
+  return true
 })
 
 router.afterEach((to) => {

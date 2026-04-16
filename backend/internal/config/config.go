@@ -14,6 +14,16 @@ type Config struct {
 	Database DatabaseConfig
 	Amap     AmapConfig
 	Doubao   DoubaoConfig
+	Auth     AuthConfig
+}
+
+type AuthConfig struct {
+	JWTSecret  string
+	TokenTTLMs int
+}
+
+func (a AuthConfig) TokenTTL() time.Duration {
+	return time.Duration(a.TokenTTLMs) * time.Millisecond
 }
 
 type AppConfig struct {
@@ -86,6 +96,10 @@ func Load() (*Config, error) {
 			BaseURL:   getEnv("DOUBAO_BASE", "https://ark.cn-beijing.volces.com"),
 			Model:     getEnv("DOUBAO_MODEL", ""),
 			TimeoutMs: getEnvInt("DOUBAO_TIMEOUT_MS", 60000),
+		},
+		Auth: AuthConfig{
+			JWTSecret:  getEnv("AUTH_JWT_SECRET", "commute-dev-secret-change-me"),
+			TokenTTLMs: getEnvInt("AUTH_TOKEN_TTL_MS", 7*24*60*60*1000), // 7 天
 		},
 	}
 

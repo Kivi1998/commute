@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/haojia/commute/internal/middleware"
 	"github.com/haojia/commute/internal/model"
 	"github.com/haojia/commute/internal/repository"
 	"github.com/haojia/commute/internal/service"
@@ -31,7 +32,7 @@ func parseID(c *gin.Context) (int64, bool) {
 }
 
 func (h *AddressHandler) List(c *gin.Context) {
-	list, err := h.svc.List(c.Request.Context(), model.DefaultUserID)
+	list, err := h.svc.List(c.Request.Context(), middleware.GetUserID(c))
 	if err != nil {
 		response.Internal(c, err.Error())
 		return
@@ -44,7 +45,7 @@ func (h *AddressHandler) Get(c *gin.Context) {
 	if !ok {
 		return
 	}
-	a, err := h.svc.Get(c.Request.Context(), model.DefaultUserID, id)
+	a, err := h.svc.Get(c.Request.Context(), middleware.GetUserID(c), id)
 	if errors.Is(err, repository.ErrNotFound) {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "地址不存在", nil)
 		return
@@ -62,7 +63,7 @@ func (h *AddressHandler) Create(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, response.CodeBadRequest, err.Error(), nil)
 		return
 	}
-	a, err := h.svc.Create(c.Request.Context(), model.DefaultUserID, in)
+	a, err := h.svc.Create(c.Request.Context(), middleware.GetUserID(c), in)
 	if err != nil {
 		response.Internal(c, err.Error())
 		return
@@ -83,7 +84,7 @@ func (h *AddressHandler) Update(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, response.CodeBadRequest, err.Error(), nil)
 		return
 	}
-	a, err := h.svc.Update(c.Request.Context(), model.DefaultUserID, id, in)
+	a, err := h.svc.Update(c.Request.Context(), middleware.GetUserID(c), id, in)
 	if errors.Is(err, repository.ErrNotFound) {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "地址不存在", nil)
 		return
@@ -100,7 +101,7 @@ func (h *AddressHandler) SetDefault(c *gin.Context) {
 	if !ok {
 		return
 	}
-	a, err := h.svc.SetDefault(c.Request.Context(), model.DefaultUserID, id)
+	a, err := h.svc.SetDefault(c.Request.Context(), middleware.GetUserID(c), id)
 	if errors.Is(err, repository.ErrNotFound) {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "地址不存在", nil)
 		return
@@ -117,7 +118,7 @@ func (h *AddressHandler) Delete(c *gin.Context) {
 	if !ok {
 		return
 	}
-	err := h.svc.Delete(c.Request.Context(), model.DefaultUserID, id)
+	err := h.svc.Delete(c.Request.Context(), middleware.GetUserID(c), id)
 	if errors.Is(err, repository.ErrNotFound) {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "地址不存在", nil)
 		return

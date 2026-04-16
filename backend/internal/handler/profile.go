@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/haojia/commute/internal/middleware"
 	"github.com/haojia/commute/internal/model"
 	"github.com/haojia/commute/internal/repository"
 	"github.com/haojia/commute/internal/service"
@@ -20,7 +21,7 @@ func NewProfileHandler(svc *service.ProfileService) *ProfileHandler {
 }
 
 func (h *ProfileHandler) Get(c *gin.Context) {
-	p, err := h.svc.Get(c.Request.Context(), model.DefaultUserID)
+	p, err := h.svc.Get(c.Request.Context(), middleware.GetUserID(c))
 	if errors.Is(err, repository.ErrNotFound) {
 		response.OK(c, nil)
 		return
@@ -38,7 +39,7 @@ func (h *ProfileHandler) Upsert(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, response.CodeBadRequest, err.Error(), nil)
 		return
 	}
-	p, err := h.svc.Upsert(c.Request.Context(), model.DefaultUserID, in)
+	p, err := h.svc.Upsert(c.Request.Context(), middleware.GetUserID(c), in)
 	if err != nil {
 		response.Internal(c, err.Error())
 		return

@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/haojia/commute/internal/middleware"
 	"github.com/haojia/commute/internal/model"
 	"github.com/haojia/commute/internal/repository"
 	"github.com/haojia/commute/internal/service"
@@ -37,7 +38,7 @@ func (h *CommuteHandler) Calculate(c *gin.Context) {
 		warning = "soft_limit_exceeded"
 	}
 
-	result, err := h.svc.Calculate(c.Request.Context(), model.DefaultUserID, in)
+	result, err := h.svc.Calculate(c.Request.Context(), middleware.GetUserID(c), in)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			response.Fail(c, http.StatusNotFound, response.CodeNotFound, err.Error(), nil)
@@ -64,7 +65,7 @@ func (h *CommuteHandler) GetResult(c *gin.Context) {
 	if !ok {
 		return
 	}
-	r, err := h.svc.GetResultDetail(c.Request.Context(), model.DefaultUserID, id)
+	r, err := h.svc.GetResultDetail(c.Request.Context(), middleware.GetUserID(c), id)
 	if errors.Is(err, repository.ErrNotFound) {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "结果不存在", nil)
 		return
@@ -81,7 +82,7 @@ func (h *CommuteHandler) ListByQuery(c *gin.Context) {
 	if !ok {
 		return
 	}
-	list, err := h.svc.ListQueryResults(c.Request.Context(), model.DefaultUserID, id)
+	list, err := h.svc.ListQueryResults(c.Request.Context(), middleware.GetUserID(c), id)
 	if err != nil {
 		response.Internal(c, err.Error())
 		return
@@ -91,7 +92,7 @@ func (h *CommuteHandler) ListByQuery(c *gin.Context) {
 
 func (h *CommuteHandler) ListQueries(c *gin.Context) {
 	limit := 50
-	list, err := h.svc.ListQueries(c.Request.Context(), model.DefaultUserID, limit)
+	list, err := h.svc.ListQueries(c.Request.Context(), middleware.GetUserID(c), limit)
 	if err != nil {
 		response.Internal(c, err.Error())
 		return
@@ -104,7 +105,7 @@ func (h *CommuteHandler) GetQuery(c *gin.Context) {
 	if !ok {
 		return
 	}
-	q, err := h.svc.GetQueryDetail(c.Request.Context(), model.DefaultUserID, id)
+	q, err := h.svc.GetQueryDetail(c.Request.Context(), middleware.GetUserID(c), id)
 	if errors.Is(err, repository.ErrNotFound) {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "查询不存在", nil)
 		return
@@ -121,7 +122,7 @@ func (h *CommuteHandler) DeleteQuery(c *gin.Context) {
 	if !ok {
 		return
 	}
-	err := h.svc.DeleteQuery(c.Request.Context(), model.DefaultUserID, id)
+	err := h.svc.DeleteQuery(c.Request.Context(), middleware.GetUserID(c), id)
 	if errors.Is(err, repository.ErrNotFound) {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "查询不存在", nil)
 		return
