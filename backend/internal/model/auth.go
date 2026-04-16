@@ -12,8 +12,10 @@ type User struct {
 }
 
 // LoginInput 登录请求
+//
+// Email 字段语义为"登录账号名"（不强制邮箱格式），既可以是邮箱也可以是昵称。
 type LoginInput struct {
-	Email    string `json:"email" binding:"required,email,max=128"`
+	Email    string `json:"email" binding:"required,min=1,max=128"`
 	Password string `json:"password" binding:"required,min=1,max=128"`
 }
 

@@ -2,7 +2,7 @@
 import { reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { LockOutlined, MailOutlined } from '@ant-design/icons-vue'
+import { LockOutlined, UserOutlined } from '@ant-design/icons-vue'
 import { useAuthStore } from '@/store/auth'
 
 const router = useRouter()
@@ -16,7 +16,7 @@ const form = reactive({
 
 async function handleLogin() {
   if (!form.email || !form.password) {
-    message.warning('请填写邮箱和密码')
+    message.warning('请填写账号和密码')
     return
   }
   try {
@@ -46,14 +46,14 @@ function quickFill(email: string, password: string) {
 
       <a-card :bordered="false" class="shadow-lg">
         <a-form layout="vertical" @submit.prevent="handleLogin">
-          <a-form-item label="邮箱">
+          <a-form-item label="账号">
             <a-input
               v-model:value="form.email"
               size="large"
-              placeholder="email@example.com"
+              placeholder="账号名"
               autocomplete="username"
             >
-              <template #prefix><MailOutlined class="text-slate-400" /></template>
+              <template #prefix><UserOutlined class="text-slate-400" /></template>
             </a-input>
           </a-form-item>
 
@@ -89,21 +89,21 @@ function quickFill(email: string, password: string) {
         <div class="space-y-2 text-xs">
           <div
             class="flex justify-between items-center p-2 rounded bg-slate-50 hover:bg-slate-100 cursor-pointer"
-            @click="quickFill('jiahao@diit.cn', 'commute123')"
+            @click="quickFill('kivi', '542426')"
           >
             <div>
-              <div class="font-medium text-slate-700">jiahao@diit.cn</div>
+              <div class="font-medium text-slate-700">kivi</div>
               <div class="text-slate-400">主账号（含已有数据）</div>
             </div>
             <a-button size="small" type="link">填入</a-button>
           </div>
           <div
             class="flex justify-between items-center p-2 rounded bg-slate-50 hover:bg-slate-100 cursor-pointer"
-            @click="quickFill('demo@example.com', 'demo123')"
+            @click="quickFill('dudu', '311416')"
           >
             <div>
-              <div class="font-medium text-slate-700">demo@example.com</div>
-              <div class="text-slate-400">演示账号</div>
+              <div class="font-medium text-slate-700">dudu</div>
+              <div class="text-slate-400">第二账号</div>
             </div>
             <a-button size="small" type="link">填入</a-button>
           </div>
