@@ -165,23 +165,25 @@ stop_all() {
 }
 
 # ---- 状态 ----
+show_one_status() {
+  local name="$1" port="$2" pidfile="$3"
+  local pid occupied
+  pid=$(read_pid "$pidfile" || true)
+  occupied=$(port_pid "$port" || true)
+  if [ -n "$pid" ] && pid_alive "$pid" && [ -n "$occupied" ]; then
+    ok "$name 运行中 PID=$pid  → http://localhost:$port"
+  elif [ -n "$occupied" ]; then
+    warn "$name 端口 $port 被其他进程占用 (PID $occupied)"
+  else
+    echo -e "${c_dim}○ $name 未运行${c_reset}"
+  fi
+}
+
 show_status() {
-  for svc in "后端:$BACKEND_PORT:$BACKEND_PID" "前端:$FRONTEND_PORT:$FRONTEND_PID"; do
-    IFS=: read -r name port pidfile <<<"$svc"
-    local pid
-    pid=$(read_pid "$pidfile")
-    if [ -n "$pid" ] && pid_alive "$pid" && port_pid "$port" >/dev/null; then
-      ok "$name 运行中 PID=$pid  → http://localhost:$port"
-    else
-      local occupied
-      occupied=$(port_pid "$port")
-      if [ -n "$occupied" ]; then
-        warn "$name 端口 $port 被其他进程占用 (PID $occupied)"
-      else
-        echo -e "${c_dim}○ $name 未运行${c_reset}"
-      fi
-    fi
-  done
+  set +e
+  show_one_status "后端" "$BACKEND_PORT" "$BACKEND_PID"
+  show_one_status "前端" "$FRONTEND_PORT" "$FRONTEND_PID"
+  set -e
   echo
   echo -e "${c_dim}日志：$LOG_DIR/${c_reset}"
 }

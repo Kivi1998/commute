@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import { RocketOutlined, ReloadOutlined, CheckCircleFilled, ExclamationCircleOutlined } from '@ant-design/icons-vue'
+import {
+  RocketOutlined,
+  ReloadOutlined,
+  SyncOutlined,
+  CheckCircleFilled,
+  ExclamationCircleOutlined,
+} from '@ant-design/icons-vue'
 import {
   recommendCompanies,
   type AIRecommendInput,
@@ -9,7 +15,7 @@ import {
 } from '@/api/ai'
 import { fetchProfile, type CompanyType } from '@/api/profile'
 import { fetchEnums, type EnumItem } from '@/api/meta'
-import { batchCreateCompanies, type CompanyCreateInput } from '@/api/company'
+import { batchCreateCompanies, listCompanies, type CompanyCreateInput } from '@/api/company'
 
 const props = defineProps<{
   open: boolean
@@ -31,10 +37,15 @@ const form = reactive<AIRecommendInput>({
 
 const categoryOptions = ref<EnumItem[]>([])
 const recommending = ref(false)
+const reshuffling = ref(false)
 const importing = ref(false)
 const result = ref<AIRecommendedCompany[]>([])
 const summary = ref<{ fromCache: boolean; tokenIn: number; tokenOut: number } | null>(null)
 const selectedNames = ref<string[]>([])
+
+// 已存在公司名（用户已添加的） + 累积已推荐过但未入库的（用于"再换一批"排除）
+const existingNames = ref<string[]>([])
+const seenNames = ref<Set<string>>(new Set())
 
 const cityOptions = [
   { value: '北京', label: '北京' },
@@ -61,12 +72,27 @@ function categoryLabel(v: string) {
   return categoryOptions.value.find((o) => o.value === v)?.label ?? v
 }
 
+async function loadExistingCompanies() {
+  try {
+    const r = await listCompanies({ page_size: 100 })
+    existingNames.value = r.list.map((c) => c.name)
+  } catch {
+    existingNames.value = []
+  }
+}
+
 watch(
   () => props.open,
   async (open) => {
-    if (!open) return
-    // 首次打开加载字典 + 尝试从 profile 回填
-    const enums = await fetchEnums()
+    if (!open) {
+      // 关闭时重置累积，下次打开重新开始
+      seenNames.value = new Set()
+      result.value = []
+      summary.value = null
+      return
+    }
+    // 首次打开加载字典 + 画像 + 已有公司
+    const [enums] = await Promise.all([fetchEnums(), loadExistingCompanies()])
     categoryOptions.value = enums.company_type
     try {
       const p = await fetchProfile()
@@ -85,14 +111,21 @@ watch(
   { immediate: true },
 )
 
-async function handleRecommend() {
+// 计算当前应该排除的名字：已关注 + 本轮已见（仅在"再换一批"时使用）
+function buildExcludes(includeSeen: boolean): string[] {
+  const set = new Set(existingNames.value)
+  if (includeSeen) {
+    seenNames.value.forEach((n) => set.add(n))
+  }
+  return Array.from(set)
+}
+
+async function runRecommend(excludeSeen: boolean) {
   if (!form.city.trim() || !form.position.trim()) {
     message.warning('请填写城市和岗位')
     return
   }
-  recommending.value = true
-  result.value = []
-  selectedNames.value = []
+  const exclude = buildExcludes(excludeSeen)
   try {
     const r = await recommendCompanies({
       city: form.city,
@@ -101,6 +134,7 @@ async function handleRecommend() {
       company_types: form.company_types,
       count: form.count,
       force_refresh: form.force_refresh,
+      exclude_names: exclude.length ? exclude : undefined,
     })
     result.value = r.companies
     summary.value = {
@@ -108,15 +142,35 @@ async function handleRecommend() {
       tokenIn: r.token_input ?? 0,
       tokenOut: r.token_output ?? 0,
     }
-    // 默认勾选所有"坐标已匹配"的公司
     selectedNames.value = r.companies.filter((c) => c.location_confident).map((c) => c.name)
+    // 把本次推荐的名字记入 seen
+    r.companies.forEach((c) => seenNames.value.add(c.name))
     if (r.from_cache) {
       message.info('返回结果来自 24h 缓存')
     } else {
-      message.success(`AI 推荐完成，共 ${r.companies.length} 家`)
+      const excludedHint = exclude.length ? `（已排除 ${exclude.length} 家）` : ''
+      message.success(`AI 推荐完成，共 ${r.companies.length} 家 ${excludedHint}`)
     }
+  } catch {
+    // 拦截器已提示
+  }
+}
+
+async function handleRecommend() {
+  recommending.value = true
+  try {
+    await runRecommend(false) // 首次只排除已关注的
   } finally {
     recommending.value = false
+  }
+}
+
+async function handleReshuffle() {
+  reshuffling.value = true
+  try {
+    await runRecommend(true) // "再换一批" 排除已关注 + 本轮已见
+  } finally {
+    reshuffling.value = false
   }
 }
 
@@ -195,7 +249,6 @@ async function handleImport() {
     @cancel="emit('update:open', false)"
     @update:open="(v: boolean) => emit('update:open', v)"
   >
-    <!-- 配置区 -->
     <a-card size="small" :bordered="false" class="!bg-slate-50">
       <a-form layout="vertical" :colon="false" class="!mt-0">
         <div class="grid grid-cols-2 gap-x-3">
@@ -235,26 +288,40 @@ async function handleImport() {
           </a-form-item>
         </div>
 
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 flex-wrap">
           <a-button type="primary" :loading="recommending" @click="handleRecommend">
             <template #icon><RocketOutlined /></template>
             开始推荐
           </a-button>
+          <a-button
+            :loading="reshuffling"
+            :disabled="!result.length"
+            @click="handleReshuffle"
+          >
+            <template #icon><SyncOutlined /></template>
+            再换一批
+          </a-button>
           <a-checkbox v-model:checked="form.force_refresh">
             强制刷新（跳过 24h 缓存）
           </a-checkbox>
-          <span v-if="summary" class="text-xs text-slate-500 ml-auto">
-            <a-tag v-if="summary.fromCache" color="blue">来自缓存</a-tag>
-            <a-tag v-else color="green">实时生成</a-tag>
-            <span v-if="!summary.fromCache">
-              tokens: 入 {{ summary.tokenIn }} · 出 {{ summary.tokenOut }}
-            </span>
+          <span class="text-xs text-slate-500 ml-auto">
+            已排除 {{ existingNames.length }} 家已关注
+            <template v-if="seenNames.size > 0">
+              + {{ seenNames.size }} 家本轮已见
+            </template>
+          </span>
+        </div>
+
+        <div v-if="summary" class="mt-2 text-xs text-slate-500">
+          <a-tag v-if="summary.fromCache" color="blue" class="!m-0">来自缓存</a-tag>
+          <a-tag v-else color="green" class="!m-0">实时生成</a-tag>
+          <span v-if="!summary.fromCache" class="ml-2">
+            tokens: 入 {{ summary.tokenIn }} · 出 {{ summary.tokenOut }}
           </span>
         </div>
       </a-form>
     </a-card>
 
-    <!-- 结果区 -->
     <div v-if="result.length" class="mt-4">
       <div class="flex justify-between items-center mb-3">
         <div>
@@ -333,7 +400,7 @@ async function handleImport() {
       </div>
     </div>
 
-    <div v-else-if="recommending" class="text-center py-12">
+    <div v-else-if="recommending || reshuffling" class="text-center py-12">
       <a-spin size="large" />
       <div class="mt-3 text-slate-500">豆包 AI 正在思考，通常需要 20-40 秒...</div>
     </div>

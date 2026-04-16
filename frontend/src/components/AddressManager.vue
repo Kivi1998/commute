@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { message, Modal, type TableColumnsType } from 'ant-design-vue'
-import { PlusOutlined, StarFilled } from '@ant-design/icons-vue'
+import { CopyOutlined, PlusOutlined, StarFilled } from '@ant-design/icons-vue'
 import {
   createAddress,
   deleteAddress,
@@ -11,10 +11,12 @@ import {
   type HomeAddress,
   type HomeAddressCreateInput,
 } from '@/api/address'
+import { fetchProfile, type Profile } from '@/api/profile'
 import AddressFormModal from './AddressFormModal.vue'
 
 const list = ref<HomeAddress[]>([])
 const loading = ref(false)
+const profile = ref<Profile | null>(null)
 
 const modalState = reactive<{
   open: boolean
@@ -35,7 +37,17 @@ async function refresh() {
   }
 }
 
-onMounted(refresh)
+async function loadProfile() {
+  try {
+    profile.value = await fetchProfile()
+  } catch {
+    // 无画像不影响使用
+  }
+}
+
+onMounted(async () => {
+  await Promise.all([refresh(), loadProfile()])
+})
 
 function openCreate() {
   modalState.mode = 'create'
@@ -91,13 +103,46 @@ function handleDelete(record: HomeAddress) {
   })
 }
 
+async function handleCopy(record: HomeAddress) {
+  const name = profile.value?.full_name?.trim()
+  const phone = profile.value?.phone?.trim()
+  const lines: string[] = [record.address]
+  if (name || phone) {
+    lines.push([name, phone].filter(Boolean).join(' '))
+  }
+  const text = lines.join('\n')
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+    } else {
+      // 回退方案：创建 textarea + execCommand
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+    }
+    if (!name && !phone) {
+      message.warning({
+        content: '地址已复制，但画像还没填姓名/电话，建议先到"个人画像"补齐',
+        duration: 4,
+      })
+    } else {
+      message.success('已复制到剪贴板')
+    }
+  } catch {
+    message.error('复制失败，请手动复制')
+  }
+}
+
 const columns: TableColumnsType<HomeAddress> = [
+  { title: '默认', key: 'is_default', width: 70, align: 'center' },
   { title: '别名', dataIndex: 'alias', width: 140 },
   { title: '地址', dataIndex: 'address', ellipsis: true },
-  { title: '经纬度', key: 'coord', width: 200 },
-  { title: '默认', key: 'is_default', width: 80, align: 'center' },
-  { title: '备注', dataIndex: 'note', ellipsis: true },
-  { title: '操作', key: 'action', width: 220, fixed: 'right' },
+  { title: '操作', key: 'action', width: 280, fixed: 'right' },
 ]
 </script>
 
@@ -122,25 +167,28 @@ const columns: TableColumnsType<HomeAddress> = [
       size="middle"
     >
       <template #bodyCell="slotProps">
-        <template v-if="slotProps.column.key === 'coord'">
-          <span class="font-mono text-xs text-slate-500">
-            {{ slotProps.record.longitude.toFixed(6) }}, {{ slotProps.record.latitude.toFixed(6) }}
-          </span>
-        </template>
-        <template v-else-if="slotProps.column.key === 'is_default'">
-          <StarFilled v-if="slotProps.record.is_default" class="!text-amber-500" />
+        <template v-if="slotProps.column.key === 'is_default'">
+          <StarFilled v-if="slotProps.record.is_default" class="!text-amber-500" title="默认" />
           <span v-else class="text-slate-300">—</span>
         </template>
         <template v-else-if="slotProps.column.key === 'action'">
           <a-space size="small">
-            <a-button size="small" type="link" @click="openEdit(slotProps.record as HomeAddress)">编辑</a-button>
+            <a-button size="small" type="link" @click="handleCopy(slotProps.record as HomeAddress)">
+              <template #icon><CopyOutlined /></template>
+              复制
+            </a-button>
+            <a-button size="small" type="link" @click="openEdit(slotProps.record as HomeAddress)">
+              编辑
+            </a-button>
             <a-button
               size="small"
               type="link"
               :disabled="slotProps.record.is_default"
               @click="handleSetDefault(slotProps.record as HomeAddress)"
             >设为默认</a-button>
-            <a-button size="small" type="link" danger @click="handleDelete(slotProps.record as HomeAddress)">删除</a-button>
+            <a-button size="small" type="link" danger @click="handleDelete(slotProps.record as HomeAddress)">
+              删除
+            </a-button>
           </a-space>
         </template>
       </template>

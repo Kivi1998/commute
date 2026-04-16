@@ -29,11 +29,14 @@ func NewAIService(repo *repository.AIRepo, doubaoClient *doubao.Client, amapClie
 }
 
 // RecommendCompanies 主入口：缓存 → 豆包 → POI 二次校验 → 写缓存
+//
+// ExcludeNames 不参与 cache_key，但出现时强制绕开缓存（每次"再换一批"都是新鲜数据）
 func (s *AIService) RecommendCompanies(ctx context.Context, userID int64, in model.AIRecommendInput) (*model.AIRecommendResult, error) {
+	hasExcludes := len(in.ExcludeNames) > 0
 	cacheKey := repository.BuildCacheKey(userID, in)
 
-	// 1. 查缓存
-	if !in.ForceRefresh {
+	// 1. 查缓存（有 exclude 则跳过缓存，保证能换新）
+	if !in.ForceRefresh && !hasExcludes {
 		if cached, err := s.repo.FindCache(ctx, cacheKey); err == nil {
 			return buildResultFromCache(cached)
 		} else if !errors.Is(err, repository.ErrNotFound) {
@@ -51,6 +54,7 @@ func (s *AIService) RecommendCompanies(ctx context.Context, userID int64, in mod
 		ExperienceYears: in.ExperienceYears,
 		CompanyTypes:    in.CompanyTypes,
 		Count:           in.Count,
+		ExcludeNames:    in.ExcludeNames,
 	})
 	if err != nil {
 		return nil, err
@@ -79,17 +83,24 @@ func (s *AIService) RecommendCompanies(ctx context.Context, userID int64, in mod
 	}
 	wg.Wait()
 
-	// 4. 写缓存（即使有条目 POI 失败也缓存，毕竟豆包调用已花钱）
-	cached, err := s.repo.InsertCache(ctx, userID, in, cacheKey, companies,
-		raw.Usage.PromptTokens, raw.Usage.CompletionTokens, aiCacheTTL)
-	if err != nil {
-		return nil, err
+	// 4. 写缓存（exclude 场景不写缓存，因为是"再换一批"的临时结果）
+	if !hasExcludes {
+		if cached, err := s.repo.InsertCache(ctx, userID, in, cacheKey, companies,
+			raw.Usage.PromptTokens, raw.Usage.CompletionTokens, aiCacheTTL); err == nil {
+			return &model.AIRecommendResult{
+				FromCache:   false,
+				CachedAt:    &cached.RequestedAt,
+				ExpiresAt:   &cached.ExpiresAt,
+				Companies:   companies,
+				TokenInput:  raw.Usage.PromptTokens,
+				TokenOutput: raw.Usage.CompletionTokens,
+			}, nil
+		} else {
+			return nil, err
+		}
 	}
-
 	return &model.AIRecommendResult{
 		FromCache:   false,
-		CachedAt:    &cached.RequestedAt,
-		ExpiresAt:   &cached.ExpiresAt,
 		Companies:   companies,
 		TokenInput:  raw.Usage.PromptTokens,
 		TokenOutput: raw.Usage.CompletionTokens,

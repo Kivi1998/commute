@@ -8,6 +8,7 @@ export interface AIRecommendInput {
   company_types?: CompanyType[]
   count?: number
   force_refresh?: boolean
+  exclude_names?: string[]
 }
 
 export interface AIRecommendedCompany {

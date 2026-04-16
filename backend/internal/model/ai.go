@@ -10,6 +10,8 @@ type AIRecommendInput struct {
 	CompanyTypes    []string `json:"company_types" binding:"omitempty,dive,oneof=big_tech mid_tech startup foreign other"`
 	Count           int      `json:"count" binding:"omitempty,min=5,max=50"`
 	ForceRefresh    bool     `json:"force_refresh"`
+	// ExcludeNames 要排除的公司名（用户已关注的或上轮已见到的）。传入时会自动 force_refresh 绕开缓存。
+	ExcludeNames []string `json:"exclude_names" binding:"omitempty,max=100,dive,max=128"`
 }
 
 // AIRecommendedCompany 单条推荐（供前端展示）

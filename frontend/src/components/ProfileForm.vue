@@ -12,6 +12,9 @@ import {
 defineProps<{ enums: Enums }>()
 
 const form = reactive<ProfileUpsertInput>({
+  full_name: '',
+  phone: '',
+  email: '',
   current_city: '',
   current_city_code: '',
   target_position: '',
@@ -26,6 +29,9 @@ onMounted(async () => {
   try {
     const p = await fetchProfile()
     if (p) {
+      form.full_name = p.full_name ?? ''
+      form.phone = p.phone ?? ''
+      form.email = p.email ?? ''
       form.current_city = p.current_city
       form.current_city_code = p.current_city_code ?? ''
       form.target_position = p.target_position
@@ -63,6 +69,9 @@ async function handleSubmit() {
   submitting.value = true
   try {
     const payload: ProfileUpsertInput = {
+      full_name: form.full_name?.trim() || undefined,
+      phone: form.phone?.trim() || undefined,
+      email: form.email?.trim() || undefined,
       current_city: form.current_city,
       current_city_code: form.current_city_code || undefined,
       target_position: form.target_position,
@@ -80,6 +89,20 @@ async function handleSubmit() {
 <template>
   <a-spin :spinning="loading">
     <a-form layout="vertical" class="max-w-xl pt-2">
+      <div class="text-xs text-slate-500 mb-2">联系人信息（用于地址复制卡片展示）</div>
+      <div class="grid grid-cols-3 gap-3">
+        <a-form-item label="姓名">
+          <a-input v-model:value="form.full_name" :maxlength="32" placeholder="如：张三" />
+        </a-form-item>
+        <a-form-item label="电话">
+          <a-input v-model:value="form.phone" :maxlength="20" placeholder="手机号" />
+        </a-form-item>
+        <a-form-item label="邮箱">
+          <a-input v-model:value="form.email" :maxlength="128" placeholder="name@example.com" />
+        </a-form-item>
+      </div>
+
+      <div class="text-xs text-slate-500 mt-2 mb-2">求职信息</div>
       <a-form-item label="当前所在城市" required>
         <a-select
           v-model:value="form.current_city"

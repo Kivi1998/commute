@@ -9,11 +9,12 @@ import (
 
 // RecommendCompaniesInput 推荐参数
 type RecommendCompaniesInput struct {
-	City             string
-	Position         string
-	ExperienceYears  *int
-	CompanyTypes     []string // big_tech / mid_tech / startup / foreign / other
-	Count            int      // 建议 15-30
+	City            string
+	Position        string
+	ExperienceYears *int
+	CompanyTypes    []string // big_tech / mid_tech / startup / foreign / other
+	Count           int      // 建议 15-30
+	ExcludeNames    []string // 排除的公司名（已添加 + 已推荐但未入库）
 }
 
 // RecommendedCompany AI 返回的单个公司
@@ -72,8 +73,12 @@ func buildUserPrompt(in RecommendCompaniesInput) string {
 			b.WriteString(fmt.Sprintf("偏好公司类型：%s\n", strings.Join(labels, "、")))
 		}
 	}
+	if len(in.ExcludeNames) > 0 {
+		b.WriteString(fmt.Sprintf("⚠️ 必须排除以下公司（用户已关注或已见过，不要再推荐）：%s\n",
+			strings.Join(in.ExcludeNames, "、")))
+	}
 	b.WriteString(fmt.Sprintf(`
-请推荐 %d 家符合条件的公司。严格按以下 JSON 格式返回（必须是纯 JSON，不要任何其他文字）：
+请推荐 %d 家符合条件的公司（严格排除上述列表中的任何一家）。严格按以下 JSON 格式返回（必须是纯 JSON，不要任何其他文字）：
 
 {
   "companies": [
@@ -100,9 +105,9 @@ func (c *Client) RecommendCompanies(ctx context.Context, in RecommendCompaniesIn
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: buildUserPrompt(in)},
 		},
-		Temperature: &temp,
-		TopP:        &topP,
-		MaxTokens:   &maxTokens,
+		Temperature:    &temp,
+		TopP:           &topP,
+		MaxTokens:      &maxTokens,
 		ResponseFormat: &ResponseFormat{Type: "json_object"},
 	})
 	if err != nil {
@@ -110,6 +115,12 @@ func (c *Client) RecommendCompanies(ctx context.Context, in RecommendCompaniesIn
 	}
 	if len(resp.Choices) == 0 {
 		return nil, fmt.Errorf("doubao: empty choices")
+	}
+
+	// 客户端侧兜底：即使 prompt 已要求排除，LLM 也可能漏过，再本地过滤一次
+	excludeSet := make(map[string]bool, len(in.ExcludeNames))
+	for _, n := range in.ExcludeNames {
+		excludeSet[strings.TrimSpace(n)] = true
 	}
 
 	content := resp.Choices[0].Message.Content
@@ -128,16 +139,19 @@ func (c *Client) RecommendCompanies(ctx context.Context, in RecommendCompaniesIn
 		return nil, fmt.Errorf("doubao decode companies: %w; content=%s", err, truncate(content, 200))
 	}
 
-	// 过滤无效分类，归并到 other
-	for i := range parsed.Companies {
-		cat := parsed.Companies[i].Category
-		if _, ok := categoryLabelCN[cat]; !ok {
-			parsed.Companies[i].Category = "other"
+	filtered := make([]RecommendedCompany, 0, len(parsed.Companies))
+	for _, c := range parsed.Companies {
+		if excludeSet[strings.TrimSpace(c.Name)] {
+			continue
 		}
+		if _, ok := categoryLabelCN[c.Category]; !ok {
+			c.Category = "other"
+		}
+		filtered = append(filtered, c)
 	}
 
 	return &RecommendCompaniesResult{
-		Companies: parsed.Companies,
+		Companies: filtered,
 		Usage:     resp.Usage,
 	}, nil
 }
